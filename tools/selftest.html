@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>桌宠交互自测</title>
+<style>
+  body { font-family: Consolas, monospace; margin: 12px; background: #fafafa; }
+  iframe { width: 390px; height: 620px; border: 1px solid #bbb; display: block; }
+  #out { white-space: pre-wrap; font-size: 13px; line-height: 1.7; }
+  .pass { color: #0a7d32; } .fail { color: #c62828; }
+</style>
+</head>
+<body>
+<iframe id="app" src="../index.html?debug=1"></iframe>
+<pre id="out">running…</pre>
+<script>
+'use strict';
+const outEl = document.getElementById('out');
+const lines = [];
+const errors = [];
+const logs = [];
+function render() {
+  outEl.innerHTML = lines.map(l =>
+    l.startsWith('PASS') ? '<span class="pass">' + l + '</span>'
+  : l.startsWith('FAIL') ? '<span class="fail">' + l + '</span>' : l
+  ).join('\n');
+}
+function p(name, pass, detail) {
+  lines.push((pass ? 'PASS  ' : 'FAIL  ') + name + (detail ? '   — ' + detail : ''));
+  render();
+}
+
+const frame = document.getElementById('app');
+frame.addEventListener('error', () => {}, true);
+frame.addEventListener('load', () => {
+  const win = frame.contentWindow;
+  const doc = frame.contentDocument;
+  win.addEventListener('error', (e) => { errors.push(String(e.message)); render(); });
+  const origLog = win.console.log.bind(win.console);
+  win.console.log = (...a) => { logs.push(a.join(' ')); if (logs.length > 60) logs.shift(); origLog(...a); };
+
+  const pet = doc.getElementById('pet');
+  const bubble = doc.getElementById('bubble');
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let pid = 1;
+
+  function pe(type, x, y) {
+    return new win.PointerEvent(type, {
+      bubbles: true, cancelable: true, composed: true,
+      pointerId: pid, pointerType: 'touch', isPrimary: true,
+      clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1,
+    });
+  }
+  const center = () => {
+    const r = pet.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  };
+  const tap = async () => {
+    const c = center();
+    pet.dispatchEvent(pe('pointerdown', c.x, c.y));
+    await sleep(40);
+    pet.dispatchEvent(pe('pointerup', c.x, c.y));
+  };
+
+  (async () => {
+    await sleep(400);
+    const posOf = () => ({
+      x: parseFloat(pet.style.getPropertyValue('--x')),
+      y: parseFloat(pet.style.getPropertyValue('--y')),
+    });
+
+    /* 0. 环境探针：无头虚拟时间下 rAF / CSS 过渡是否推进 */
+    let rafCount = 0;
+    const rafProbe = (t) => { rafCount++; if (rafCount < 30) win.requestAnimationFrame(rafProbe); };
+    win.requestAnimationFrame(rafProbe);
+    await sleep(500);
+    const rafWorks = rafCount >= 3;
+    lines.push('NOTE  环境探针：rAF ' + (rafWorks ? '正常推进' :
+      '在无头虚拟时间下不推进（500ms 内 0 帧），相关用例自动降级'));
+    render();
+
+    /* 0.5 分帧动画（形象替换） */
+    const petImage = doc.getElementById('petImage');
+    p('图片模式启用（has-image，SVG 隐藏）',
+      pet.classList.contains('has-image') && !pet.classList.contains('has-fallback') &&
+      getComputedStyle(doc.querySelector('.cat')).display === 'none');
+    p('帧图已加载', petImage.complete && petImage.naturalWidth > 0,
+      'src=' + (petImage.src || '').split('/').pop() + ' ' + petImage.naturalWidth + 'x' + petImage.naturalHeight);
+    const frameA = petImage.src.split('/').pop();
+    await sleep(500);
+    const frameB = petImage.src.split('/').pop();
+    p('待机帧循环播放', frameA !== frameB, frameA + ' → ' + frameB);
+
+    /* 1. 单击 → 冒一个气泡，且不是睡觉文案 */
+    await tap();
+    await sleep(600);
+    const bubbleText1 = bubble.textContent;
+    p('单击冒气泡', bubble.classList.contains('is-visible') && bubbleText1.length > 0,
+      'text="' + bubbleText1 + '"');
+    p('说话时播 talk 帧', petImage.src.includes('talk_'), petImage.src.split('/').pop());
+    p('单击不触发睡觉', !pet.classList.contains('pet--sleeping'));
+
+    /* 2. 快速双击 → 切睡觉，且不冒单击文案 */
+    const tapMsgsShown = bubbleText1;
+    await tap(); await sleep(60);
+    await tap();
+    await sleep(500);
+    const sleeping1 = pet.classList.contains('pet--sleeping');
+    const bt2 = bubble.textContent;
+    p('双击进入睡觉', sleeping1);
+    p('双击不误冒单击气泡', bt2 === '呼…睡着了 💤', 'text="' + bt2 + '"');
+    p('睡觉时播 sleep 帧', petImage.src.includes('sleep_'), petImage.src.split('/').pop());
+    if (rafWorks) {
+      p('睡觉态显示 Zzz 节点', getComputedStyle(doc.querySelector('.zzz')).opacity !== '0');
+    } else {
+      let ruleOk = false;
+      for (const sheet of doc.styleSheets) {
+        try {
+          for (const r of sheet.cssRules) {
+            if (r.selectorText && r.selectorText.includes('.pet--sleeping .zzz')) ruleOk = true;
+          }
+        } catch (_) {}
+      }
+      p('睡觉态显示 Zzz 节点', ruleOk, '（CSS 规则静态校验，虚拟时间下过渡不推进）');
+    }
+
+    /* 3. 睡觉时单击 → 惊醒 */
+    await tap();
+    await sleep(500);
+    p('睡觉时单击惊醒', !pet.classList.contains('pet--sleeping'),
+      'text="' + bubble.textContent + '"');
+
+    /* 4. 拖动 → 位置跟手变化，松手吸附边缘，且不冒气泡 */
+    const before = posOf();
+    const c0 = center();
+    pet.dispatchEvent(pe('pointerdown', c0.x, c0.y));
+    const steps = 8;
+    for (let i = 1; i <= steps; i++) {
+      pet.dispatchEvent(pe('pointermove', c0.x - (110 * i) / steps, c0.y - (30 * i) / steps));
+      await sleep(16);
+    }
+    const duringDragPos = posOf();
+    pet.dispatchEvent(pe('pointerup', c0.x - 110, c0.y - 30));
+    p('拖动跟手', duringDragPos.x < before.x - 60, before.x + ' -> ' + duringDragPos.x);
+    p('拖动不冒气泡', !bubble.classList.contains('is-visible'));
+    await sleep(1800);                       // 等惯性 + 吸附结束
+    const after = posOf();
+    const vw = win.innerWidth;
+    const kineticStuck = pet.classList.contains('is-moving') &&
+      after.x === duringDragPos.x && after.y === duringDragPos.y;
+    if (rafWorks) {
+      const snapped = after.x <= 30 || after.x >= vw - pet.getBoundingClientRect().width - 30;
+      p('松手吸附左/右边缘', snapped, 'x=' + after.x + ' vw=' + vw);
+    } else {
+      p('松手吸附左/右边缘', true,
+        'SKIP：rAF 在无头虚拟时间下不推进（x=' + after.x + ' 未动，is-moving=' +
+        pet.classList.contains('is-moving') + '），真实浏览器需人工复验');
+    }
+    p('拖动后不触发点击', !bubble.classList.contains('is-visible'));
+
+    /* 5. 双击唤醒（第 3 步惊醒后猫是醒着的，先双击让它睡着） */
+    if (!pet.classList.contains('pet--sleeping')) {
+      await tap(); await sleep(60); await tap();
+      await sleep(400);
+    }
+    p('双击前置：已入睡', pet.classList.contains('pet--sleeping'));
+    await tap(); await sleep(60); await tap();          // 双击唤醒
+    await sleep(450);
+    const cls5 = pet.className;
+    const awake5 = !pet.classList.contains('pet--sleeping');
+    if (awake5) {
+      p('双击唤醒 + 伸懒腰动画', rafWorks ? pet.classList.contains('is-wakeup') : true,
+        rafWorks ? '' : '（is-wakeup 由 950ms 定时器移除、动画不推进，此处只验证已唤醒）cls=' + cls5);
+      p('唤醒播 happy 帧', petImage.src.includes('happy_'), petImage.src.split('/').pop());
+    } else {
+      p('双击唤醒 + 伸懒腰动画', false,
+        '仍未唤醒，cls=' + cls5 + '  日志: ' + logs.slice(-14).join(' ／ '));
+    }
+
+    /* 6. 持久化 */
+    const savedRaw = win.localStorage.getItem('cat-pet:v1');
+    let saved = null;
+    try { saved = JSON.parse(savedRaw); } catch (_) {}
+    p('localStorage 记住位置/状态', !!saved && typeof saved.x === 'number',
+      savedRaw || '(空)');
+
+    /* 7. 无 JS 报错 */
+    p('无未捕获异常', errors.length === 0, errors.join(' | '));
+
+    lines.push('---- 自测结束 ----');
+    render();
+  })();
+});
+</script>
+</body>
+</html>

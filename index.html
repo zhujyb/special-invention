@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport-fit=cover 适配刘海屏；禁用缩放避免双击放大 -->
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+
+  <title>橘猫桌宠</title>
+  <meta name="description" content="一只离线也能陪你的橘猫桌宠：拖动、单击聊天、双击睡觉。">
+
+  <!-- ===== PWA / iOS meta ===== -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#ffb366">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="橘猫桌宠">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- 用于 JS 读取安全区（env(safe-area-inset-*)）的探针 -->
+  <div id="safeProbe" class="safe-probe" aria-hidden="true"></div>
+
+  <!-- 页面主体（桌宠浮在其上）。背景刻意极简，模拟"手机桌面" -->
+  <main class="hub">
+    <h1 class="hub__title">橘猫桌宠</h1>
+    <p class="hub__tip">拖动换位置 · 单击说说话 · 双击睡觉</p>
+  </main>
+
+  <!-- ===== 桌宠根节点：fixed 定位，实际位置由 --x/--y 两个 CSS 变量驱动 ===== -->
+  <div id="pet" class="pet has-fallback" role="button" tabindex="0"
+       aria-label="橘猫桌宠：可拖动，单击聊天，双击睡觉">
+
+    <!-- 文字气泡 -->
+    <div id="bubble" class="bubble" role="status" aria-live="polite" hidden></div>
+
+    <!-- 舞台：呼吸 / 打哈欠 / 唤醒等整体动作都作用在这一层 -->
+    <div class="pet__stage">
+
+      <!-- 头像容器：默认显示 SVG 占位橘猫脸；USE_IMAGE=true 时切换为分帧动画 -->
+      <div class="pet__avatar">
+        <!-- A. 纯 SVG 占位橘猫脸（USE_IMAGE=false 时显示，零图片可跑） -->
+        <svg class="cat" viewBox="0 0 100 100" aria-hidden="true">
+          <!-- 耳朵 -->
+          <polygon class="cat__ear" points="20.5,31.5 11.5,7.5 41.5,20.5"/>
+          <polygon class="cat__ear" points="79.5,31.5 88.5,7.5 58.5,20.5"/>
+          <polygon class="cat__ear-in" points="23.5,30 18,14.5 37.5,23.5"/>
+          <polygon class="cat__ear-in" points="76.5,30 82,14.5 62.5,23.5"/>
+          <!-- 脸 -->
+          <circle class="cat__face" cx="50" cy="57.5" r="33.5"/>
+          <!-- 额头条纹 -->
+          <path class="cat__stripe" d="M42.8 28.5 L41.8 37.5 M50 26.2 L50 36.2 M57.2 28.5 L58.2 37.5"/>
+          <!-- 腮红 -->
+          <ellipse class="cat__blush" cx="24.5" cy="64.5" rx="7" ry="4.5"/>
+          <ellipse class="cat__blush" cx="75.5" cy="64.5" rx="7" ry="4.5"/>
+          <!-- 白色口鼻区 -->
+          <ellipse class="cat__muzzle" cx="50" cy="70" rx="11.5" ry="7.5"/>
+          <!-- 胡须 -->
+          <path class="cat__whisker" d="M18.5 61.5 L7.5 59.2 M18.5 66.8 L7.5 69 M81.5 61.5 L92.5 59.2 M81.5 66.8 L92.5 69"/>
+          <!-- 眼睛（眨眼 = scaleY；睡觉 = 压成细线） -->
+          <ellipse class="cat__eye" cx="37.8" cy="53.5" rx="5.2" ry="6.1"/>
+          <ellipse class="cat__eye" cx="62.2" cy="53.5" rx="5.2" ry="6.1"/>
+          <circle class="cat__glint" cx="36.4" cy="51.4" r="1.7"/>
+          <circle class="cat__glint" cx="60.8" cy="51.4" r="1.7"/>
+          <!-- 鼻子 + 嘴 -->
+          <polygon class="cat__nose" points="50,64.4 46.4,68.2 53.6,68.2"/>
+          <path class="cat__mouth" d="M50 68.4 q-3 4 -6.2 3.4 M50 68.4 q3 4 6.2 3.4"/>
+          <!-- 打哈欠时张开的嘴（平时隐藏） -->
+          <ellipse class="cat__mouth-open" cx="50" cy="71.5" rx="5.5" ry="6.2"/>
+        </svg>
+
+        <!-- B. 分帧动画图（USE_IMAGE=true 时启用，JS 按状态切换 img/pet/*.png 各帧） -->
+        <img id="petImage" class="pet__image" alt="" hidden draggable="false">
+      </div>
+
+      <!-- Zzz（仅睡觉态显示） -->
+      <div id="zzz" class="zzz" aria-hidden="true">
+        <span class="zzz__z">Z</span>
+        <span class="zzz__z">Z</span>
+        <span class="zzz__z">Z</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- iOS 无法自动弹安装提示，这里给一次性引导条 -->
+  <aside id="iosHint" class="ios-hint" hidden>
+    <span>想把橘猫装到桌面？点 Safari 的「分享」→「添加到主屏幕」，断网也能玩</span>
+    <button id="iosHintClose" class="ios-hint__close" type="button" aria-label="关闭提示">×</button>
+  </aside>
+
+  <script src="pet.js" defer></script>
+</body>
+</html>

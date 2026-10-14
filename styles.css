@@ -1,0 +1,342 @@
+/* ==========================================================================
+   橘猫桌宠 — 样式
+   分区：变量 / 基础与触摸阻断 / 页面 / 桌宠定位 / SVG 猫脸 / 动作动画
+         / 睡觉态 / 气泡 / Zzz / iOS 引导条 / 动效减弱
+   ========================================================================== */
+
+/* ---------------- 变量 ---------------- */
+:root {
+  /* 桌宠显示尺寸 */
+  --pet-size: clamp(72px, 20vw, 104px);
+
+  /* ★ 图片替换点：换成真实图片时改这里，例如 url('img/cat.png') */
+  --pet-image: none;
+
+  /* 安全区（JS 通过 #safeProbe 读取实际值，这里供 CSS 直接使用） */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+
+  /* 配色 */
+  --c-orange: #f5a623;
+  --c-orange-deep: #d67e11;
+  --c-outline: #a85c0c;
+  --c-ink: #3b2a1a;
+  --c-blush: #ff9a9e;
+  --c-nose: #ff7c7c;
+  --c-mouth: #7a5a3a;
+  --c-mouth-inner: #cf6b5f;
+  --c-muzzle: #fff7eb;
+  --c-cream: #fdf6e3;
+  --c-text: #5b4636;
+}
+
+/* ---------------- 基础与触摸阻断 ---------------- */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;                 /* 页面不滚动 */
+  overscroll-behavior: none;        /* 关掉橡皮筋回弹 */
+}
+
+body {
+  font-family: system-ui, -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
+  color: var(--c-text);
+  background:
+    radial-gradient(120% 90% at 82% 100%, #ffe9c7 0%, var(--c-cream) 48%, #fdfbf5 100%)
+    fixed;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;      /* 关掉 iOS 长按菜单 */
+  touch-action: manipulation;       /* 页面级：只允许点按，禁双击缩放 */
+}
+
+/* JS 读取安全区的探针（不可见） */
+.safe-probe {
+  position: fixed;
+  left: 0; top: 0;
+  width: 0; height: 0;
+  padding: 0;
+  padding-top: var(--safe-t);
+  padding-right: var(--safe-r);
+  padding-bottom: var(--safe-b);
+  padding-left: var(--safe-l);
+  pointer-events: none;
+  border: 0;
+}
+
+/* ---------------- 页面 ---------------- */
+.hub {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(var(--safe-t) + 15vh) 20px calc(var(--safe-b) + 20px);
+  pointer-events: none;             /* 不挡桌宠手势 */
+}
+
+.hub__title {
+  margin: 0;
+  font-size: clamp(22px, 6.4vw, 32px);
+  letter-spacing: .12em;
+  font-weight: 700;
+  color: #8a6a45;
+}
+
+.hub__tip {
+  margin: 10px 0 0;
+  font-size: 13px;
+  letter-spacing: .06em;
+  opacity: .55;
+  animation: hubFade .9s ease 7s forwards;   /* 提示几秒后淡出 */
+}
+
+@keyframes hubFade { to { opacity: 0; } }
+
+/* ---------------- 桌宠定位 ---------------- */
+.pet {
+  position: fixed;
+  left: 0; top: 0;
+  width: var(--pet-size);
+  height: var(--pet-size);
+  /* 位置只走 transform（JS 只改 --x / --y），不触发重排 */
+  transform: translate3d(var(--x, 0px), var(--y, 0px), 0);
+  z-index: 9999;
+  touch-action: none;               /* 宠物区域内禁掉滚动/缩放，手势全归 JS */
+  cursor: grab;
+  outline: none;
+}
+.pet:focus-visible { border-radius: 50%; box-shadow: 0 0 0 3px rgba(245, 166, 35, .55); }
+.pet.is-moving { cursor: grabbing; }
+.pet.is-moving .pet__stage { will-change: transform; }
+
+.pet__stage {
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 88%;
+  animation: breathe 5.4s ease-in-out infinite;   /* 待机呼吸：更慢更轻 */
+}
+
+.pet__avatar {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform .12s ease;  /* 按压下沉反馈 */
+  transform-origin: 50% 90%;
+}
+.pet.is-pressed .pet__avatar { transform: scale(.92); }
+
+/* ★ 图片替换点：把 #pet 的 has-fallback 改成 has-image 即启用真实图片 */
+.pet.has-image .cat { display: none; }
+.pet.has-image .pet__avatar {
+  background-image: var(--pet-image);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.pet__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ---------------- SVG 猫脸 ---------------- */
+.cat {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 5px 7px rgba(90, 55, 15, .28));
+  overflow: visible;
+}
+
+.cat__face   { fill: var(--c-orange); stroke: var(--c-outline); stroke-width: 2.2; }
+.cat__ear    { fill: var(--c-orange); stroke: var(--c-outline); stroke-width: 2.2; stroke-linejoin: round; }
+.cat__ear-in { fill: var(--c-blush); opacity: .85; }
+.cat__stripe { stroke: var(--c-orange-deep); stroke-width: 3; fill: none; stroke-linecap: round; opacity: .9; }
+.cat__blush  { fill: var(--c-blush); opacity: .55; }
+.cat__muzzle { fill: var(--c-muzzle); opacity: .92; }
+.cat__glint  { fill: #fff; }
+.cat__nose   { fill: var(--c-nose); }
+.cat__mouth  { stroke: var(--c-mouth); stroke-width: 1.9; fill: none; stroke-linecap: round; }
+.cat__mouth-open { fill: var(--c-mouth-inner); opacity: 0; transition: opacity .15s ease; }
+.cat__whisker{ stroke: var(--c-mouth); stroke-width: 1.5; fill: none; stroke-linecap: round; opacity: .8; }
+
+/* 眼睛：眨眼/睡觉都靠 scaleY，以自身为中心缩放 */
+.cat__eye {
+  fill: var(--c-ink);
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform .1s ease;
+}
+
+/* ---------------- 瞬时动作 ---------------- */
+/* 眨眼 */
+.pet.is-blink .cat__eye { transform: scaleY(.08); }
+.pet.is-blink .cat__glint { opacity: 0; }
+
+/* 打哈欠：整体拉伸 + 眯眼 + 张嘴（幅度收窄，不再明显拉伸） */
+.pet.is-yawn .pet__stage { animation: yawn 1.25s ease-in-out; }
+.pet.is-yawn .cat__eye { transform: scaleY(.45); }
+.pet.is-yawn .cat__glint { opacity: 0; }
+.pet.is-yawn .cat__mouth { opacity: 0; }
+.pet.is-yawn .cat__mouth-open { opacity: 1; }
+
+@keyframes yawn {
+  0%, 100% { transform: scale(1); }
+  30%      { transform: scale(1.012, .992); }
+  55%      { transform: scale(.996, 1.028); }
+  75%      { transform: scale(1.004, 1.008); }
+}
+
+/* 唤醒伸懒腰（幅度收窄） */
+.pet.is-wakeup .pet__stage { animation: wakeup .95s ease-out; }
+@keyframes wakeup {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(.992, 1.035); }
+  60%  { transform: scale(1.018, .99); }
+  100% { transform: scale(1); }
+}
+
+/* ---------------- 睡觉态 ---------------- */
+.pet--sleeping .cat__eye { transform: scaleY(.07); }
+.pet--sleeping .cat__glint { opacity: 0; }
+.pet--sleeping .cat__mouth { opacity: .55; }
+.pet--sleeping .pet__stage { animation: breathe-slow 6.5s ease-in-out infinite; }
+.pet--sleeping.is-pressed .pet__avatar { transform: scale(.985); }
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.014); }
+}
+@keyframes breathe-slow {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.006, .998); }
+}
+
+/* ---------------- Zzz ---------------- */
+.zzz {
+  position: absolute;
+  left: 58%;
+  top: -8%;
+  width: 40px;
+  height: 40px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .4s ease;
+}
+.pet--sleeping .zzz { opacity: 1; }
+.zzz__z {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  font-weight: 800;
+  font-size: 15px;
+  color: #7a9ecb;
+  opacity: 0;
+  animation: zzzFloat 2.4s ease-in-out infinite;
+}
+.zzz__z:nth-child(2) { animation-delay: .8s;  font-size: 12px; }
+.zzz__z:nth-child(3) { animation-delay: 1.6s; font-size: 9px; }
+
+@keyframes zzzFloat {
+  0%   { transform: translate(0, 0) scale(.7); opacity: 0; }
+  30%  { opacity: .95; }
+  100% { transform: translate(14px, -30px) scale(1.15); opacity: 0; }
+}
+
+/* ---------------- 文字气泡 ---------------- */
+.bubble {
+  position: absolute;
+  bottom: calc(100% + 10px);        /* 默认在宠物上方（JS 会再按屏幕边缘做夹取） */
+  left: 50%;
+  width: max-content;
+  max-width: min(62vw, 230px);
+  padding: 8px 13px;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--c-text);
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+  overflow-wrap: break-word;
+  box-shadow: 0 6px 16px rgba(90, 55, 15, .18);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events: none;
+  white-space: normal;
+  z-index: 2;
+}
+.bubble.is-visible { opacity: 1; transform: translateY(0); }
+
+/* 气泡尾巴：--tail-x 由 JS 按宠物中心点计算 */
+.bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: var(--tail-x, 50%);
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-top-color: #fff;
+}
+
+/* 宠物贴屏幕顶部时，气泡改到下方 */
+.bubble.bubble--below { bottom: auto; top: calc(100% + 10px); }
+.bubble.bubble--below::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #fff;
+}
+
+/* ---------------- iOS 添加到主屏引导条 ---------------- */
+.ios-hint {
+  position: fixed;
+  left: max(14px, var(--safe-l));
+  right: max(14px, var(--safe-r));
+  bottom: calc(var(--safe-b) + 16px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  background: rgba(59, 42, 26, .92);
+  color: #fff7eb;
+  font-size: 13px;
+  line-height: 1.45;
+  box-shadow: 0 10px 24px rgba(60, 35, 10, .3);
+  animation: hintIn .35s ease;
+}
+.ios-hint[hidden] { display: none; }
+.ios-hint__close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .16);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+@keyframes hintIn { from { opacity: 0; transform: translateY(10px); } }
+
+/* ---------------- 动效减弱 ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  .pet__stage, .pet--sleeping .pet__stage { animation: none !important; }
+  .zzz__z { animation-duration: 4s; }
+  .bubble, .cat__eye, .pet__avatar { transition-duration: .01s; }
+  .hub__tip { animation: none; }
+}
