@@ -45,9 +45,7 @@ html, body {
 body {
   font-family: system-ui, -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
   color: var(--c-text);
-  background:
-    radial-gradient(120% 90% at 82% 100%, #ffe9c7 0%, var(--c-cream) 48%, #fdfbf5 100%)
-    fixed;
+  background:transparent;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;      /* 关掉 iOS 长按菜单 */
